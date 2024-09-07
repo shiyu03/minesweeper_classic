@@ -2,4 +2,7 @@
 
 MineSweeper game based on pyqt5 that simulates classic minesweeper game interface.
 
-![UI](ui.png)
+
+UI with classic solver:
+
+![UI](ui.jpg)
