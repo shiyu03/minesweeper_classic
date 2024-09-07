@@ -96,19 +96,13 @@ class MinesweeperGameWSearcher(MinesweeperGameWSolver):
         return handler
 
     def newGame(self, rows, cols, mines):
-        self.env.new_game(rows, cols, mines)
         self.solver.reset()
-        self.updateMineLabel()
-        self.initGame()
+        super().newGame(rows, cols, mines)
 
     def replayGame(self):
-        self.env.replay()
         self.solver.replay()
-        self.updateMineLabel()
-        self.initGame()
-    # TODO 新开一把加载时间比较长
+        super().replayGame()
+
     def resetGame(self):
-        self.env.reset()
         self.solver.reset()
-        self.updateMineLabel()
-        self.initGame()
+        super().resetGame()

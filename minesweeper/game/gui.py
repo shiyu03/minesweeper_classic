@@ -75,19 +75,19 @@ class MinesweeperGame(QMainWindow):
         hardAction.triggered.connect(lambda: self.newGame(30, 16, 99))
         gameMenu.addAction(hardAction)
 
+    def add_cell(self, row, col):
+        button = Cell(row, col, self.dpi)
+        button.leftReleased.connect(self.makeMoveHndlr(row, col))
+        button.rightClicked.connect(self.flagCellHndlr(row, col))
+        self.gridLayout.addWidget(button, row, col)
+        self.cells[(row, col)] = button
+
     def initGame(self):
         print("New Game")
-        for button in self.cells.values():
-            self.gridLayout.removeWidget(button)
-            button.deleteLater()
         self.cells = {}
         for row in range(self.env.rows):
             for col in range(self.env.cols):
-                button = Cell(row, col, self.dpi)
-                button.leftReleased.connect(self.makeMoveHndlr(row, col))
-                button.rightClicked.connect(self.flagCellHndlr(row, col))
-                self.gridLayout.addWidget(button, row, col)
-                self.cells[(row, col)] = button
+                self.add_cell(row, col)
 
     def makeMoveHndlr(self, row, col, show_last_action=False):
         def handler():
@@ -140,19 +140,56 @@ class MinesweeperGame(QMainWindow):
                 self.replayGame()
 
     def newGame(self, rows, cols, mines):
+        old_rows, old_cols = self.env.rows, self.env.cols
+        new_rows, new_cols = rows, cols
+
+        cells_add = []
+        cells_delete = []
+
+        if new_rows > old_rows:
+            for row in range(old_rows, new_rows):
+                for col in range(old_cols):
+                    cells_add.append((row, col))
+        if new_cols > old_cols:
+            for row in range(new_rows):
+                for col in range(old_cols, new_cols):
+                    cells_add.append((row, col))
+
+        if new_rows < old_rows:
+            for row in range(new_rows, old_rows):
+                for col in range(old_cols):
+                    cells_delete.append((row, col))
+        if new_cols < old_cols:
+            for row in range(new_rows):
+                for col in range(new_cols, old_cols):
+                    cells_delete.append((row, col))
+
+        for row in range(min(new_rows, old_rows)):
+            for col in range(min(new_cols, old_cols)):
+                self.cells.get((row, col)).updateState(CellState.UNREVEALED_EMPTY)
+
+        for row, col in cells_add:
+            self.add_cell(row, col)
+
+        for row, col in cells_delete:
+            button = self.cells.pop((row, col))
+            self.gridLayout.removeWidget(button)
+            button.deleteLater()
+
         self.env.new_game(rows, cols, mines)
         self.updateMineLabel()
-        self.initGame()
 
     def replayGame(self):
         self.env.replay()
         self.updateMineLabel()
-        self.initGame()
+        for cell in self.cells.values():
+            cell.updateState(CellState.UNREVEALED_EMPTY)
 
     def resetGame(self):
         self.env.reset()
         self.updateMineLabel()
-        self.initGame()
+        for cell in self.cells.values():
+            cell.updateState(CellState.UNREVEALED_EMPTY)
 
     def updateMineLabel(self):
         self.mineLabel.setText(f'{self.env.mines - self.env.flags}')
@@ -230,7 +267,7 @@ class Cell(QPushButton):
         csstext = f'border: {border}px solid gray;'
         color = COLORS.get(self.text, QColor(0, 0, 0))
         if self.state == CellState.REVEALED_EMPTY or self.state.is_revealed_num():
-            background_color = 'darkgray' if holding else 'white' if not is_last_action else 'yellow'
+            background_color = 'darkgray' if holding else 'lightgoldenrodyellow' if not is_last_action else 'yellow'
             csstext += font_normal
             csstext += f' color: {color.name()}; background-color: {background_color};'
             csstext += f' padding: 0px -{nudge.get(self.text, 0)}px 0px {nudge.get(self.text, 0)}px;'
