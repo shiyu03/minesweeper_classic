@@ -31,7 +31,7 @@ class MinesweeperGameWSolver(MinesweeperGame):
         def handler():
             last_action = (row, col) if show_last_action else None
             if self.env.make_move(row, col, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive):
-                self.revealAllMines(last_action=last_action)
+                self.revealAllMines()
                 self.gameOver(False)
                 return
             self.updateCells(last_action=last_action)

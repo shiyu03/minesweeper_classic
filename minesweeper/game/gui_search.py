@@ -62,6 +62,7 @@ class MinesweeperGameWSearcher(MinesweeperGameWSolver):
         self.replayButton.setFixedSize(self.restartButton.size())
         self.replayButton.clicked.connect(self.replayGame)
         self.topLayout.addWidget(self.replayButton, 0, 3)
+
     def initSolver(self, rows, cols, mines):
         self.solver = ClassicMinesweeperSolver(self.env)
 
@@ -70,9 +71,9 @@ class MinesweeperGameWSearcher(MinesweeperGameWSolver):
 
     def handle_solver_move(self, row, col, flag):
         if flag:
-            self.flagCellHndlr(row, col, show_last_action=False)()
+            self.flagCellHndlr(row, col, show_last_action=True)()
         else:
-            self.makeMoveHndlr(row, col, show_last_action=False, allow_click_revealed_num=False, allow_recursive=True)()
+            self.makeMoveHndlr(row, col, show_last_action=True, allow_click_revealed_num=False, allow_recursive=True)()
 
     def flagCellHndlr(self, row, col, show_last_action=True):
         def handler():
@@ -86,7 +87,7 @@ class MinesweeperGameWSearcher(MinesweeperGameWSolver):
         def handler():
             last_action = (row, col) if show_last_action else None
             if self.env.make_move(row, col, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive):
-                self.revealAllMines(last_action=last_action)
+                self.revealAllMines()
                 self.gameOver(False)
                 return
             self.solver.first_click = False

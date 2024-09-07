@@ -22,6 +22,7 @@ class MinesweeperGame(QMainWindow):
     def __init__(self, rows=16, cols=16, mines=40, *, logical_dpi):
         super().__init__()
         self.dpi = logical_dpi
+        self.last_action_cells = set()
 
         self.env = MinesweeperEnv(rows, cols, mines)
         self.initUI()
@@ -93,7 +94,7 @@ class MinesweeperGame(QMainWindow):
         def handler():
             last_action = (row, col) if show_last_action else None
             if self.env.make_move(row, col, allow_click_revealed_num=True, allow_recursive=True):
-                self.revealAllMines(last_action=last_action)
+                self.revealAllMines()
                 self.gameOver(False)
                 return
             self.updateCells(last_action=last_action)
@@ -115,17 +116,22 @@ class MinesweeperGame(QMainWindow):
 
     def updateCells(self, last_action=None):
         state, board, flags, mine_positions = self.env.get_game_state()
-        for row, col in self.env.last_updated_cells:
-            cell = self.cells[(row, col)]
-            cell.updateState(state[row][col], mines_around=board[row][col], is_last_action=(row, col)==last_action)
+        to_be_updated = self.env.last_updated_cells.union(self.last_action_cells)
         self.env.last_updated_cells.clear()
+        self.last_action_cells.clear()
+        for row, col in to_be_updated:
+            cell = self.cells[(row, col)]
+            is_last_action = (row, col) == last_action
+            if is_last_action:
+                self.last_action_cells.add((row, col))
+            cell.updateState(state[row][col], mines_around=board[row][col], is_last_action=is_last_action)
 
-    def revealAllMines(self, last_action=None):
+    def revealAllMines(self):
         _, _, _, mine_positions = self.env.get_game_state()
         for pos in mine_positions:
             row, col = divmod(pos, self.env.cols)
             if self.env.state[row][col] != CellState.UNREVEALED_FLAG:
-                self.cells[(row, col)].updateState(CellState.REVEALED_MINE, is_last_action=(row, col)==last_action)
+                self.env.reveal_cell(row, col)
 
     def gameOver(self, won):
         if won:

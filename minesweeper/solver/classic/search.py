@@ -101,6 +101,7 @@ class ClassicMinesweeperSolver:
         # 对于一个数num，限定num个雷的区域，然后判断对周围其他数字的影响。
         # TODO 当然也可以有连锁反应，多个不重合的雷限定区域一起组合，再确定能影响的数字，不断迭代。
         # TODO 而且同时考虑多个数字可以扩大雷的限定区域，不断迭代。如两个格时的1、2定律（暂实现为advanced2）
+        # TODO 考虑三个格的情况 See TODO.png, https://minesweeper.cn/doc/jichudingshi.htm 最后一条
         for row in range(self.env.rows):
             for col in range(self.env.cols):
                 if self.env.state[row][col].is_revealed_num():
