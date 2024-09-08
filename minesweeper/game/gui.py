@@ -78,8 +78,8 @@ class MinesweeperGame(QMainWindow):
 
     def add_cell(self, row, col):
         button = Cell(row, col, self.dpi)
-        button.leftReleased.connect(self.makeMoveHndlr(row, col))
-        button.rightClicked.connect(self.flagCellHndlr(row, col))
+        button.leftReleased.connect(self.makeMoveHndlr(row, col, flag=False))
+        button.rightClicked.connect(self.makeMoveHndlr(row, col, flag=True))
         self.gridLayout.addWidget(button, row, col)
         self.cells[(row, col)] = button
 
@@ -90,10 +90,18 @@ class MinesweeperGame(QMainWindow):
             for col in range(self.env.cols):
                 self.add_cell(row, col)
 
-    def makeMoveHndlr(self, row, col, show_last_action=False, allow_click_revealed_num=True, allow_recursive=True):
-        def handler():
+    def makeMoveHndlr(self, row, col, flag: bool, show_last_action=False, allow_click_revealed_num=True, allow_recursive=True):
+        if flag:
+            def handler_flag():
+                last_action = (row, col) if show_last_action else None
+                self.env.make_move(row, col, flag=True)
+                self.updateCells(last_action=last_action)
+                self.updateMineLabel()
+            return handler_flag
+
+        def handler_reveal():
             last_action = (row, col) if show_last_action else None
-            if self.env.make_move(row, col, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive):
+            if self.env.make_move(row, col, flag=False, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive):
                 self.revealAllMines()
                 self.updateCells(last_action=last_action)
                 self.gameOver(False)
@@ -103,14 +111,7 @@ class MinesweeperGame(QMainWindow):
                 self.gameOver(True)
                 return
             self.updateCells(last_action=last_action)
-        return handler
-
-    def flagCellHndlr(self, row, col):
-        def handler():
-            self.env.flag_cell(row, col)
-            self.updateCell(row, col)
-            self.updateMineLabel()
-        return handler
+        return handler_reveal
 
     def updateCell(self, row, col):
         state, board, flags, mine_positions = self.env.get_game_state()

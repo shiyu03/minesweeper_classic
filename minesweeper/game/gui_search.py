@@ -70,21 +70,11 @@ class MinesweeperGameWSearcher(MinesweeperGameWSolver):
         self.solver_worker.start()
 
     def handle_solver_move(self, row, col, flag):
-        if flag:
-            self.flagCellHndlr(row, col, show_last_action=True)()
-        else:
-            self.makeMoveHndlr(row, col, show_last_action=True, allow_click_revealed_num=False, allow_recursive=True)()
+        self.makeMoveHndlr(row, col, flag=flag, show_last_action=True, allow_click_revealed_num=False, allow_recursive=True)()
 
-    def flagCellHndlr(self, row, col, show_last_action=True):
-        def handler():
-            last_action = (row, col) if show_last_action else None
-            self.env.flag_cell(row, col)
-            self.updateCells(last_action=last_action)
-            self.updateMineLabel()
-        return handler
+    def makeMoveHndlr(self, row, col, flag: bool, show_last_action=True, allow_click_revealed_num=True, allow_recursive=True):
+        handler_super = super().makeMoveHndlr(row, col, flag, show_last_action, allow_click_revealed_num, allow_recursive)
 
-    def makeMoveHndlr(self, row, col, show_last_action=True, allow_click_revealed_num=True, allow_recursive=True):
-        handler_super = super().makeMoveHndlr(row, col, show_last_action, allow_click_revealed_num, allow_recursive)
         def handler():
             self.solver.first_click = False
             handler_super()

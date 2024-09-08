@@ -95,16 +95,6 @@ class MinesweeperEnv:
                     count += 1
         return count
 
-    def flag_cell(self, row, col):
-        # TODO meger into make move
-        if self.state[row][col] == CellState.UNREVEALED_EMPTY:
-            self.state[row][col] = CellState.UNREVEALED_FLAG
-            self.flags += 1
-        elif self.state[row][col] == CellState.UNREVEALED_FLAG:
-            self.state[row][col] = CellState.UNREVEALED_EMPTY
-            self.flags -= 1
-        self.last_updated_cells.add((row, col))
-
     def generate_mines(self, first_row, first_col):
         all_positions = set(range(self.rows * self.cols))
         first_click_position = first_row * self.cols + first_col
@@ -154,13 +144,23 @@ class MinesweeperEnv:
     def is_in_board(self, row, col):
         return 0 <= row < self.rows and 0 <= col < self.cols
 
-    def make_move(self, row, col, allow_click_revealed_num=False, allow_recursive=True, allow_retry=False):
+    def make_move(self, row, col, flag, allow_click_revealed_num=False, allow_recursive=True, allow_retry=False):
         """
         :return: is game over
         """
         if self.first_click:
             self.first_click = False
             self.generate_mines(row, col)
+        if flag:
+            if self.state[row][col] == CellState.UNREVEALED_EMPTY:
+                self.state[row][col] = CellState.UNREVEALED_FLAG
+                self.flags += 1
+            elif self.state[row][col] == CellState.UNREVEALED_FLAG:
+                self.state[row][col] = CellState.UNREVEALED_EMPTY
+                self.flags -= 1
+            self.last_updated_cells.add((row, col))
+            return False  # Continue game
+
         if (allow_click_revealed_num and
             self.state[row][col].is_revealed_num() and
             self.count_flags_around(row, col) == self.board[row][col]
