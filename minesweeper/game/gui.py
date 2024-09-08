@@ -90,16 +90,19 @@ class MinesweeperGame(QMainWindow):
             for col in range(self.env.cols):
                 self.add_cell(row, col)
 
-    def makeMoveHndlr(self, row, col, show_last_action=False):
+    def makeMoveHndlr(self, row, col, show_last_action=False, allow_click_revealed_num=True, allow_recursive=True):
         def handler():
             last_action = (row, col) if show_last_action else None
-            if self.env.make_move(row, col, allow_click_revealed_num=True, allow_recursive=True):
+            if self.env.make_move(row, col, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive):
                 self.revealAllMines()
+                self.updateCells(last_action=last_action)
                 self.gameOver(False)
                 return
-            self.updateCells(last_action=last_action)
-            if self.env.check_win():
+            elif self.env.check_win():
+                self.updateCells(last_action=last_action)
                 self.gameOver(True)
+                return
+            self.updateCells(last_action=last_action)
         return handler
 
     def flagCellHndlr(self, row, col):

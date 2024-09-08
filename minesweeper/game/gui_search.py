@@ -84,16 +84,10 @@ class MinesweeperGameWSearcher(MinesweeperGameWSolver):
         return handler
 
     def makeMoveHndlr(self, row, col, show_last_action=True, allow_click_revealed_num=True, allow_recursive=True):
+        handler_super = super().makeMoveHndlr(row, col, show_last_action, allow_click_revealed_num, allow_recursive)
         def handler():
-            last_action = (row, col) if show_last_action else None
-            if self.env.make_move(row, col, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive):
-                self.revealAllMines()
-                self.gameOver(False)
-                return
             self.solver.first_click = False
-            self.updateCells(last_action=last_action)
-            if self.env.check_win():
-                self.gameOver(True)
+            handler_super()
         return handler
 
     def newGame(self, rows, cols, mines):

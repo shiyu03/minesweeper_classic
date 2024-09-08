@@ -28,16 +28,7 @@ class MinesweeperGameWSolver(MinesweeperGame):
     def solverMove(self): ...
 
     def makeMoveHndlr(self, row, col, show_last_action=True, allow_click_revealed_num=True, allow_recursive=True):
-        def handler():
-            last_action = (row, col) if show_last_action else None
-            if self.env.make_move(row, col, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive):
-                self.revealAllMines()
-                self.gameOver(False)
-                return
-            self.updateCells(last_action=last_action)
-            if self.env.check_win():
-                self.gameOver(True)
-        return handler
+        return super().makeMoveHndlr(row, col, show_last_action, allow_click_revealed_num, allow_recursive)
 
     def initKeyPressListener(self):
         self.centralWidget.setFocusPolicy(Qt.StrongFocus)
