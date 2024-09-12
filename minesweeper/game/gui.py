@@ -1,6 +1,4 @@
-import sys
-
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QGridLayout, QWidget, QMessageBox, QLabel, QVBoxLayout, QHBoxLayout, QGraphicsDropShadowEffect, QAction
+from PyQt5.QtWidgets import QMainWindow, QPushButton, QGridLayout, QWidget, QMessageBox, QLabel, QVBoxLayout, QGraphicsDropShadowEffect, QAction
 from PyQt5.QtGui import QColor, QFont, QLinearGradient, QBrush, QPen, QPainter, QFontMetrics
 from PyQt5.QtCore import Qt, pyqtSignal
 
@@ -56,10 +54,11 @@ class MinesweeperGame(QMainWindow):
         self.mainLayout.addLayout(self.gridLayout)
 
         self.cells: dict[tuple, Cell] = {}
-        self.initGame()
+        self.firstGame()
 
         self.createMenuBar()
-        
+        self.updateWindowSize()
+
     def createMenuBar(self):
         menubar = self.menuBar()
         gameMenu = menubar.addMenu('Game')
@@ -83,8 +82,8 @@ class MinesweeperGame(QMainWindow):
         self.gridLayout.addWidget(button, row, col)
         self.cells[(row, col)] = button
 
-    def initGame(self):
-        print("New Game")
+    def firstGame(self):
+        print("Start Game")
         self.cells = {}
         for row in range(self.env.rows):
             for col in range(self.env.cols):
@@ -150,6 +149,7 @@ class MinesweeperGame(QMainWindow):
                 self.replayGame()
 
     def newGame(self, rows, cols, mines):
+        print("New Game")
         old_rows, old_cols = self.env.rows, self.env.cols
         new_rows, new_cols = rows, cols
 
@@ -184,10 +184,12 @@ class MinesweeperGame(QMainWindow):
         for row, col in cells_delete:
             button = self.cells.pop((row, col))
             self.gridLayout.removeWidget(button)
+            button.cleanup()
             button.deleteLater()
 
         self.env.new_game(rows, cols, mines)
         self.updateMineLabel()
+        self.updateWindowSize()
 
     def replayGame(self):
         self.env.replay()
@@ -203,6 +205,21 @@ class MinesweeperGame(QMainWindow):
 
     def updateMineLabel(self):
         self.mineLabel.setText(f'{self.env.mines - self.env.flags}')
+
+    def updateWindowSize(self):
+        self.gridLayout.invalidate()
+        self.gridLayout.activate()
+        self.updateGeometry()
+        self.adjustSize()
+        self.setFixedSize(self.sizeHint())
+
+    def initKeyPressListener(self):
+        self.centralWidget.setFocusPolicy(Qt.StrongFocus)
+        self.centralWidget.keyPressEvent = self.keyPressEvent
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_R:
+            self.restartButton.click()
 
 
 class Cell(QPushButton):
@@ -228,6 +245,9 @@ class Cell(QPushButton):
         self.shadow.setColor(QColor(0, 0, 0))
         self.shadow.setOffset(0, 0)
         self.setGraphicsEffect(self.shadow)
+
+    def cleanup(self):
+        self.setGraphicsEffect(None)
 
     def mousePressEvent(self, event):
         if self.rect().contains(event.pos()):

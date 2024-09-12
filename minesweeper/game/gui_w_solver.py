@@ -30,10 +30,8 @@ class MinesweeperGameWSolver(MinesweeperGame):
     def makeMoveHndlr(self, row, col, flag: bool, show_last_action=True, allow_click_revealed_num=True, allow_recursive=True):
         return super().makeMoveHndlr(row, col, flag, show_last_action, allow_click_revealed_num, allow_recursive)
 
-    def initKeyPressListener(self):
-        self.centralWidget.setFocusPolicy(Qt.StrongFocus)
-        self.centralWidget.keyPressEvent = self.keyPressEvent
-
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_A:
             self.solverMove()
+        else:
+            super().keyPressEvent(event)

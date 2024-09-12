@@ -4,6 +4,9 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/minesweeper" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/checkpoint" />
+      <excludeFolder url="file://$MODULE_DIR$/checkpoint_wflag" />
+      <excludeFolder url="file://$MODULE_DIR$/minesweeper/runs" />
+      <excludeFolder url="file://$MODULE_DIR$/runs" />
     </content>
     <orderEntry type="jdk" jdkName="msoffice" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
