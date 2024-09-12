@@ -26,13 +26,14 @@ class MinesweeperGameWAgent(MinesweeperGameWSolver):
     def solverMove(self):
         valid_actions = self.env.get_valid_actions()
         state = self.env.get_normalized_state()
-        action = self.agent.act(state, valid_actions)
+        if self.env.first_click:
+            action = self.agent.act(state, valid_actions, force_random=True)
+        else:
+            action = self.agent.act(state, valid_actions)
         row, col = action
         print(f"Agent move: {row}, {col}")
-        self.makeMoveHndlr(row, col, show_last_action=True, allow_click_revealed_num=True, allow_recursive=False)()
+        self.makeMoveHndlr(row, col, flag=False, show_last_action=True, allow_click_revealed_num=True, allow_recursive=False)()
 
     def newGame(self, rows, cols, mines):
-        self.env.new_game(rows, cols, mines)
         self.newAgent(rows, cols, mines)
-        self.updateMineLabel()
-        self.initGame()
+        super().newGame(rows, cols, mines)

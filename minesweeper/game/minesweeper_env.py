@@ -50,6 +50,13 @@ class MinesweeperEnv:
         # Normalize value to [0, 1], since flagged will not be used in training, largest value is 10
         return float(value / (len(CellState) - 2))
 
+
+    @staticmethod
+    def _normalize_wflag(value):
+        # Normalize value to [0, 1], since flagged will be used in training, largest value is 11
+        return float(value / (len(CellState) - 1))
+
+
     def board_to_string(self, mine_position: tuple[int, int] = None, flag_mines=False):
         board_str = ""
         mine_position = mine_position or (-1, -1)
@@ -137,9 +144,27 @@ class MinesweeperEnv:
             [[self._normalize(self.state[row][col].value) for col in range(self.cols)] for row in range(self.rows)],
             dtype=np.float32)
 
+    def get_normalized_state_wflag(self):
+        return np.array(
+            [[self._normalize_wflag(self.state[row][col].value) for col in range(self.cols)] for row in range(self.rows)],
+            dtype=np.float32)
+
     def get_valid_actions(self):
         valid_actions = [(row, col) for row in range(self.rows) for col in range(self.cols) if self.state[row][col] == CellState.UNREVEALED_EMPTY]
         return valid_actions
+
+    def get_valid_actions_wflag(self):
+        valid_actions_reveal = []
+        valid_actions_flag = []
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.state[row][col] == CellState.UNREVEALED_EMPTY:
+                    valid_actions_reveal.append((row, col, 0))
+                    valid_actions_flag.append((row, col, 1))
+        return valid_actions_reveal, valid_actions_flag
+
+    def is_neighbor(self, row1, col1, row2, col2):
+        return abs(row1 - row2) <= 1 and abs(col1 - col2) <= 1
 
     def is_in_board(self, row, col):
         return 0 <= row < self.rows and 0 <= col < self.cols
@@ -152,6 +177,9 @@ class MinesweeperEnv:
             self.first_click = False
             self.generate_mines(row, col)
         if flag:
+            if allow_retry and self.board[row][col] != -1:
+                # 如果flag错了直接结束 不改状态
+                return True # Game lose
             if self.state[row][col] == CellState.UNREVEALED_EMPTY:
                 self.state[row][col] = CellState.UNREVEALED_FLAG
                 self.flags += 1

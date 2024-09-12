@@ -20,23 +20,20 @@ class DQN(nn.Module):
     def __init__(self, input_shape, output_size):
         super(DQN, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.fc1 = nn.Linear(64 * input_shape[0] * input_shape[1], 128)
-        # TODO fine-tune on different output_size
-        self.fc2 = nn.Linear(128, output_size)
+        self.fc1 = nn.Linear(64 * input_shape[0] * input_shape[1], max(128, output_size * 2))
+        self.fc2 = nn.Linear(max(128, output_size * 2), output_size)
 
     def forward(self, x):
-        x = torch.relu(self.bn1(self.conv1(x)))
-        x = torch.relu(self.bn2(self.conv2(x)))
+        x = torch.relu(self.conv1(x))
+        x = torch.relu(self.conv2(x))
         x = x.view(x.size(0), -1)
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
         return x
 
 class DQNAgent:
-    def __init__(self, input_shape, output_size):
+    def __init__(self, input_shape, output_size, comment=''):
         self.input_shape = input_shape
         self.output_size = output_size
         self.memory = deque(maxlen=2000)
@@ -50,7 +47,8 @@ class DQNAgent:
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.criterion = nn.MSELoss()
         self.episodes = 0
-        self.writer = SummaryWriter()
+        self.MAX_REWARD = 100
+        self.writer = SummaryWriter(comment=comment)
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -122,12 +120,35 @@ class DQNAgent:
         self.model.train()
         print(f"Checkpoint loaded from {checkpoint_file}")
 
-def experiment(rows, cols, mines, agent, episodes, batch_size):
-    env = MinesweeperEnv(rows, cols, mines)
-    input_shape = (env.rows, env.cols)
-    output_size = env.rows * env.cols
+    @torch.no_grad()
+    def test_play(self, env, test_episodes=100):
+        result = []
+        game_revealed = []
+        for ep in range(test_episodes):
+            env.reset()
+            reveald_cnt = 0
+            lose = False
+            valid_actions = [(r, c) for r in range(env.rows) for c in range(env.cols)]
+            while not env.check_win() and not lose:
+                state = env.get_normalized_state()
+                if env.first_click:
+                    action = self.act(state, valid_actions, force_random=True)
+                else:
+                    action = self.act(state, valid_actions)
+                valid_actions.remove(action)
+                row, col = action
+                lose = env.make_move(row, col, flag=False, allow_click_revealed_num=False, allow_recursive=False, allow_retry=False)
+                reveald_cnt += 1
+            result.append(lose)
+            game_revealed.append(reveald_cnt)
+        win_rate = result.count(False) / test_episodes
+        avg_revealed = np.average(game_revealed)
+        self.writer.add_scalar('Win rate', win_rate, self.episodes)
+        self.writer.add_scalar('Avg revealed', avg_revealed, self.episodes)
+        return win_rate, avg_revealed
 
-def map_range(value, in_max, out_max, in_min=0, out_min=0):
+
+def map_range(value, in_max, out_max, in_min=0.0, out_min=0.0):
     return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
 if __name__ == "__main__":
@@ -137,25 +158,27 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--cols', default=8, type=int, help='Number of columns in the Minesweeper grid')
     parser.add_argument('-m', '--mines', default=10, type=int, help='Number of mines in the Minesweeper grid')
     parser.add_argument('-e', '--eval', action='store_true', help='Evaluate the agent')
-    parser.add_argument('--ckpt', default='checkpoint', help='Checkpoint path')
+    parser.add_argument('--ckpt', default=os.path.join(ROOT, "checkpoint"), help='Checkpoint path')
+    parser.add_argument('--log_suffix', default="normal", help='suffix for log dirname')
     parser.add_argument('--reseteps', action='store_true', help='reset epsilon')
     parser.add_argument('--ba', default=64, type=int, help='Batch size')
-    parser.add_argument('--save_every', default=1000, type=int, help='Save checkpoint every n episodes')
+    parser.add_argument('--save_every', default=5000, type=int, help='Save checkpoint every n episodes')
+    parser.add_argument('--test_every', default=1000, type=int, help='Test play every n episodes')
     args = parser.parse_args()
 
     env = MinesweeperEnv(rows=args.rows, cols=args.cols, mines=args.mines)
     input_shape = (env.rows, env.cols)
     output_size = env.rows * env.cols
-    agent = DQNAgent(input_shape, output_size)
+    agent = DQNAgent(input_shape, output_size, args.log_suffix)
     save_every = args.save_every
-    checkpoint_dir = os.path.join(ROOT, "checkpoint")
+    checkpoint_dir = args.ckpt
     os.makedirs(checkpoint_dir, exist_ok=True)
     batch_size = args.ba
     allow_retry = True if not args.eval else False
     MAX_RETRY = args.mines if allow_retry else 1
-    allow_replay = True
-    MAX_REPLAY = 5
+    MAX_REPLAY = 1
     train_every = 10
+    test_every = args.test_every
 
     # 尝试加载检查点
     try:
@@ -199,30 +222,52 @@ if __name__ == "__main__":
                 # avoid wrong action made again.
                 valid_actions.remove(action)
                 row, col = action
-                lose = env.make_move(row, col, allow_click_revealed_num=False, allow_recursive=False, allow_retry=allow_retry)
-                # TODO maybe add flagging?
-                # TODO maybe try all possible actions?
+                lose = env.make_move(row, col, flag=False, allow_click_revealed_num=False, allow_recursive=False, allow_retry=allow_retry)
                 if lose:
                     failed_cnt += 1
                     done = True
-                    reward = -100
+                    reward = -agent.MAX_REWARD
                     # 周围没有翻开的格子时，惩罚更大，避免乱猜雷
                     if all(env.state[r][c] == CellState.UNREVEALED_EMPTY for r, c in env.get_around_cells(row, col)):
-                        reward -= 100
+                        penalty = agent.MAX_REWARD * 0.5
+                        reward -= penalty
                 else:
                     reveald_cnt += 1
                     done = env.check_win()
-                    base_reward = 10
-                    has_empty_around = any(env.state[r][c] == CellState.REVEALED_EMPTY for r, c in env.get_around_cells(row, col))
-                    reveal_percent = reveald_cnt / (env.rows * env.cols - env.mines)
-                    # 周围有空白格子时，当前格一定不是雷，点得越早越好
-                    special_award = map_range(reveald_cnt, env.rows * env.cols - env.mines, 0, in_min=2, out_min=500) if has_empty_around else 0
-                    # 开的越多，奖励越多
-                    reveal_percent_award = reveal_percent * 100
-                    reward = base_reward + reveal_percent_award + special_award
+
+                    has_empty = False
+                    row_empty, col_empty = 0, 0
+                    for r in range(env.rows):
+                        for c in range(env.cols):
+                            if env.state[r][c] == CellState.UNREVEALED_EMPTY:
+                                has_empty = True
+                                row_empty = r
+                                col_empty = c
+                                break
+                    has_empty_around = env.is_neighbor(row, col, row_empty, col_empty)
+                    if has_empty and not has_empty_around:
+                        # 如果有空白格子不点反而要惩罚，相当于输
+                        reward = -agent.MAX_REWARD
+                    else:
+                        # 开的越多，奖励越多
+                        explore_pcnt = reveald_cnt / (env.rows * env.cols - env.mines)
+
+                        # 周围有空白格子时，当前格一定不是雷，从第二步开始，点得越早奖励越大
+                        special_award_pcnt = map_range(reveald_cnt, env.rows * env.cols - env.mines, 0, in_min=2,
+                                                       out_min=0.5) if has_empty_around and not env.first_click else 0
+
+                        # 奖励不能比输的惩罚多，要不然会不在意输的惩罚，所以不超过总奖励的90%
+                        if explore_pcnt >= 0.9:
+                            # 0.9 ~ 1
+                            total_reward_pcnt = explore_pcnt
+                        else:
+                            # 0 ~ 0.9
+                            total_reward_pcnt = min(explore_pcnt + special_award_pcnt, 0.9)
+                        reward = agent.MAX_REWARD * total_reward_pcnt
+
                 # 错的次数越多，当前盘面越难，尽量避免
-                difficulty_penalty = map_range(failed_cnt, MAX_RETRY, 50, in_min=0, out_min=0)
-                reward -= difficulty_penalty
+                difficulty_penalty_pcnt = map_range(failed_cnt, MAX_RETRY, 0.2, in_min=0, out_min=0)
+                reward -= agent.MAX_REWARD * difficulty_penalty_pcnt
                 next_state = env.get_normalized_state()
                 if not args.eval:
                     agent.remember(state, action, reward, next_state, done)
@@ -272,10 +317,14 @@ if __name__ == "__main__":
                 # avg_revealed_percent = records['reveald_cnt'] / save_every / (env.rows * env.cols - env.mines) * 100
                 avg_reward = records['reward'] / save_every
                 avg_loss = records['loss'] / save_every
-                checkpoint_filename = os.path.join(checkpoint_dir, f"dqn_{env.rows}x{env.cols}x{env.mines}_ep{agent.episodes}_eps{agent.epsilon:.3f}_ba{batch_size}_reward{avg_reward:.1f}_fail{avg_fail:.1f}_ls{avg_loss:.3f}.pth")
+                checkpoint_filename = os.path.join(checkpoint_dir, f"dqn_{env.rows}x{env.cols}x{env.mines}_ep{agent.episodes}_eps{agent.epsilon:.3f}_ls{avg_loss:.3f}_ba{batch_size}_reward{avg_reward:.1f}_fail{avg_fail:.1f}.pth")
                 agent.save(checkpoint_filename)
                 print(f"Checkpoint saved at episode {agent.episodes}.")
                 records['failed_cnt'] = 0
                 records['reveald_cnt'] = 0
                 records['loss'] = 0
                 records['reward'] = 0
+
+            if test_every > 0 and agent.episodes % test_every == 0:
+                win_rate, avg_revealed = agent.test_play(env, test_episodes=100)
+                print(f"Test: Win rate: {win_rate:.2f}, Avg revealed: {avg_revealed:.2f}")
