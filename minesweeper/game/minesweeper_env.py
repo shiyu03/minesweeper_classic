@@ -171,7 +171,7 @@ class MinesweeperEnv:
 
     def make_move(self, row, col, flag, allow_click_revealed_num=False, allow_recursive=True, allow_retry=False):
         """
-        :return: is game over
+        :return: is game over, positions of cells revealed (only for safe non-flag reveal, otherwise empty)
         """
         if self.first_click:
             self.first_click = False
@@ -179,7 +179,7 @@ class MinesweeperEnv:
         if flag:
             if allow_retry and self.board[row][col] != -1:
                 # 如果flag错了直接结束 不改状态
-                return True # Game lose
+                return True, set() # Game lose
             if self.state[row][col] == CellState.UNREVEALED_EMPTY:
                 self.state[row][col] = CellState.UNREVEALED_FLAG
                 self.flags += 1
@@ -187,21 +187,22 @@ class MinesweeperEnv:
                 self.state[row][col] = CellState.UNREVEALED_EMPTY
                 self.flags -= 1
             self.last_updated_cells.add((row, col))
-            return False  # Continue game
+            return False, set()  # Continue game
 
+        revealed_cells = set()
         if (allow_click_revealed_num and
             self.state[row][col].is_revealed_num() and
             self.count_flags_around(row, col) == self.board[row][col]
         ):
-            self.reveal_neighbouring_cells(row, col, allow_recursive)
-            return False  # Continue game
-        if self.reveal_cell(row, col, allow_recursive):
+            self.reveal_neighbouring_cells(row, col, revealed_cells, allow_recursive)
+            return False, revealed_cells  # Continue game
+        if self.reveal_cell(row, col, revealed_cells, allow_recursive):
             # Not mine
-            return False # Continue game
+            return False, revealed_cells  # Continue game
         # mine
         if allow_retry:
             self.state[row][col] = CellState.UNREVEALED_EMPTY
-        return True  # Game lose
+        return True, set()  # Game lose
 
     def new_game(self, rows=None, cols=None, mines=None):
         self.rows = rows or self.rows
@@ -221,31 +222,36 @@ class MinesweeperEnv:
         self.first_click = False
         self.state = [[CellState.UNREVEALED_EMPTY for _ in range(self.cols)] for _ in range(self.rows)]
 
-    def reveal_cell(self, row, col, allow_recursive=True):
+    def reveal_cell(self, row, col, revealed_cells: set, allow_recursive=True):
         """
-        :return: is safe reveal
+        :return: is safe reveal, total # of revealed cells
         """
         self.last_updated_cells.add((row, col))
         if self.state[row][col] != CellState.UNREVEALED_EMPTY:
+            # do nothing
             return True
-        if self.board[row][col] == 0:
+        elif self.board[row][col] == 0:
             # not mine
             self.state[row][col] = CellState.REVEALED_EMPTY
+            revealed_cells.add((row, col))
             if allow_recursive and self.board[row][col] == 0:
                 for r in range(max(0, row-1), min(self.rows, row+2)):
                     for c in range(max(0, col-1), min(self.cols, col+2)):
                         if (r, c) != (row, col):
-                            self.reveal_cell(r, c, allow_recursive)
+                            self.reveal_cell(r, c, revealed_cells, allow_recursive)
             return True
         elif self.board[row][col] > 0:
             self.state[row][col] = CellState.revealed_num(self.board[row][col])
+            revealed_cells.add((row, col))
             return True
-        # mine
-        self.state[row][col] = CellState.REVEALED_MINE
-        return False
+        else:
+            # mine
+            self.state[row][col] = CellState.REVEALED_MINE
+            revealed_cells.add((row, col))
+            return False
 
-    def reveal_neighbouring_cells(self, row, col, allow_recursive=True):
+    def reveal_neighbouring_cells(self, row, col, revealed_cells: set, allow_recursive=True):
         for r in range(max(0, row-1), min(self.rows, row+2)):
             for c in range(max(0, col-1), min(self.cols, col+2)):
                 if (r, c) != (row, col) and self.state[r][c] == CellState.UNREVEALED_EMPTY:
-                    self.reveal_cell(r, c, allow_recursive)
+                    self.reveal_cell(r, c, revealed_cells, allow_recursive)

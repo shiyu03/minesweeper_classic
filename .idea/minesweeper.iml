@@ -7,6 +7,10 @@
       <excludeFolder url="file://$MODULE_DIR$/checkpoint_wflag" />
       <excludeFolder url="file://$MODULE_DIR$/minesweeper/runs" />
       <excludeFolder url="file://$MODULE_DIR$/runs" />
+      <excludeFolder url="file://$MODULE_DIR$/ckpt_normal" />
+      <excludeFolder url="file://$MODULE_DIR$/ckpt_normalrecur" />
+      <excludeFolder url="file://$MODULE_DIR$/ckpt_wflag" />
+      <excludeFolder url="file://$MODULE_DIR$/ckpt_wflagrecur" />
     </content>
     <orderEntry type="jdk" jdkName="msoffice" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

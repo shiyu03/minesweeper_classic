@@ -100,7 +100,8 @@ class MinesweeperGame(QMainWindow):
 
         def handler_reveal():
             last_action = (row, col) if show_last_action else None
-            if self.env.make_move(row, col, flag=False, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive):
+            lose, _ = self.env.make_move(row, col, flag=False, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive)
+            if lose:
                 self.revealAllMines()
                 self.updateCells(last_action=last_action)
                 self.gameOver(False)
@@ -134,7 +135,7 @@ class MinesweeperGame(QMainWindow):
         for pos in mine_positions:
             row, col = divmod(pos, self.env.cols)
             if self.env.state[row][col] != CellState.UNREVEALED_FLAG:
-                self.env.reveal_cell(row, col)
+                self.env.reveal_cell(row, col, set())
 
     def gameOver(self, won):
         if won:
