@@ -19,6 +19,8 @@ COLORS = {
 class MinesweeperGame(QMainWindow):
     def __init__(self, rows=16, cols=16, mines=40, *, logical_dpi):
         super().__init__()
+        self.is_game_lose = False
+        self.is_game_win = False
         self.dpi = logical_dpi
         self.last_action_cells = set()
 
@@ -37,13 +39,13 @@ class MinesweeperGame(QMainWindow):
         self.mainLayout.addLayout(self.topLayout)
 
         self.mineLabel = QLabel(f'{self.env.mines - self.env.flags}')
-        self.mineLabel.setFont(QFont('Microsoft Yahei', int(0.09 * self.dpi)))
+        self.mineLabel.setFont(QFont('Microsoft Yahei', int(0.12 * self.dpi)))
         self.topLayout.addWidget(self.mineLabel, 0, 0)
 
         self.restartButton = QPushButton('😊')
-        self.restartButton.setFont(QFont('Arial', int(0.09 * self.dpi)))
-        self.restartButton.setFixedSize(int(0.3 * self.dpi), int(0.3 * self.dpi))
-        self.restartButton.clicked.connect(self.resetGame)
+        self.restartButton.setFont(QFont('Arial', int(0.15 * self.dpi)))
+        self.restartButton.setFixedSize(int(0.33 * self.dpi), int(0.33 * self.dpi))
+        self.restartButton.clicked.connect(lambda: [self.resetGame(), self.updateRestartButtonText()])
         self.topLayout.addWidget(self.restartButton, 0, 1)
 
         self.empty = QLabel()
@@ -77,21 +79,22 @@ class MinesweeperGame(QMainWindow):
 
     def add_cell(self, row, col):
         button = Cell(row, col, self.dpi)
-        button.leftReleased.connect(self.makeMoveHndlr(row, col, flag=False))
-        button.rightClicked.connect(self.makeMoveHndlr(row, col, flag=True))
+        button.leftDown.connect(lambda: self.updateRestartButtonText(is_keydown=True))
+        button.leftAvailReleased.connect(self.makeMoveHndlr(row, col, flag=False))
+        button.rightDown.connect(lambda: [self.makeMoveHndlr(row, col, flag=True)(), self.updateRestartButtonText(is_keydown=True)])
+        button.mouseReleased.connect(lambda: self.updateRestartButtonText())
         self.gridLayout.addWidget(button, row, col)
         self.cells[(row, col)] = button
 
-    def firstGame(self):
-        print("Start Game")
-        self.cells = {}
-        for row in range(self.env.rows):
-            for col in range(self.env.cols):
-                self.add_cell(row, col)
+    @property
+    def is_game_over(self):
+        return self.is_game_win or self.is_game_lose
 
     def makeMoveHndlr(self, row, col, flag: bool, show_last_action=False, allow_click_revealed_num=True, allow_recursive=True):
         if flag:
             def handler_flag():
+                if self.is_game_over:
+                    return
                 last_action = (row, col) if show_last_action else None
                 self.env.make_move(row, col, flag=True)
                 self.updateCells(last_action=last_action)
@@ -99,24 +102,28 @@ class MinesweeperGame(QMainWindow):
             return handler_flag
 
         def handler_reveal():
+            if self.is_game_over:
+                return
             last_action = (row, col) if show_last_action else None
             lose, _ = self.env.make_move(row, col, flag=False, allow_click_revealed_num=allow_click_revealed_num, allow_recursive=allow_recursive)
             if lose:
+                self.is_game_lose = True
                 self.revealAllMines()
                 self.updateCells(last_action=last_action)
                 self.gameOver(False)
                 return
             elif self.env.check_win():
+                self.is_game_win = True
                 self.updateCells(last_action=last_action)
                 self.gameOver(True)
                 return
             self.updateCells(last_action=last_action)
         return handler_reveal
 
-    def updateCell(self, row, col):
-        state, board, flags, mine_positions = self.env.get_game_state()
-        cell = self.cells[(row, col)]
-        cell.updateState(state[row][col], mines_around=board[row][col])
+    # def updateCell(self, row, col):
+    #     state, board, flags, mine_positions = self.env.get_game_state()
+    #     cell = self.cells[(row, col)]
+    #     cell.updateState(state[row][col], mines_around=board[row][col])
 
     def updateCells(self, last_action=None):
         state, board, flags, mine_positions = self.env.get_game_state()
@@ -138,19 +145,28 @@ class MinesweeperGame(QMainWindow):
                 self.env.reveal_cell(row, col, set())
 
     def gameOver(self, won):
-        if won:
-            if QMessageBox.information(self, "Game over", "You won!\nOK: New game, Cancel: Replay", QMessageBox.Ok|QMessageBox.Cancel, QMessageBox.Ok) == QMessageBox.Ok:
-                self.resetGame()
-            else:
-                self.replayGame()
-        else:
-            if QMessageBox.information(self, "Game over", "Game Over!\nOK: New game, Cancel: Replay", QMessageBox.Ok|QMessageBox.Cancel, QMessageBox.Ok) == QMessageBox.Ok:
-                self.resetGame()
-            else:
-                self.replayGame()
+        self.updateRestartButtonText()
+        # if won:
+        #     rst = QMessageBox.information(self, "Game over", "You won!\nOK: New game, Cancel: Replay",
+        #                             QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
+        #     if rst == QMessageBox.Ok:
+        #         self.resetGame()
+        #     elif rst == QMessageBox.Cancel:
+        #         self.replayGame()
+
+    def firstGame(self):
+        print("Start Game")
+        self.is_game_lose = False
+        self.is_game_win = False
+        self.cells = {}
+        for row in range(self.env.rows):
+            for col in range(self.env.cols):
+                self.add_cell(row, col)
 
     def newGame(self, rows, cols, mines):
         print("New Game")
+        self.is_game_lose = False
+        self.is_game_win = False
         old_rows, old_cols = self.env.rows, self.env.cols
         new_rows, new_cols = rows, cols
 
@@ -177,7 +193,7 @@ class MinesweeperGame(QMainWindow):
 
         for row in range(min(new_rows, old_rows)):
             for col in range(min(new_cols, old_cols)):
-                self.cells.get((row, col)).updateState(CellState.UNREVEALED_EMPTY)
+                self.cells[(row, col)].updateState(CellState.UNREVEALED_EMPTY)
 
         for row, col in cells_add:
             self.add_cell(row, col)
@@ -193,12 +209,16 @@ class MinesweeperGame(QMainWindow):
         self.updateWindowSize()
 
     def replayGame(self):
+        self.is_game_lose = False
+        self.is_game_win = False
         self.env.replay()
         self.updateMineLabel()
         for cell in self.cells.values():
             cell.updateState(CellState.UNREVEALED_EMPTY)
 
     def resetGame(self):
+        self.is_game_lose = False
+        self.is_game_win = False
         self.env.reset()
         self.updateMineLabel()
         for cell in self.cells.values():
@@ -222,10 +242,21 @@ class MinesweeperGame(QMainWindow):
         if event.key() == Qt.Key_R:
             self.restartButton.click()
 
+    def updateRestartButtonText(self, *, is_keydown=False):
+        if self.is_game_win:
+            self.restartButton.setText('😎')
+        elif self.is_game_lose:
+            self.restartButton.setText('😵')
+        elif is_keydown:
+            self.restartButton.setText('😲')
+        else:
+            self.restartButton.setText('😊')
 
 class Cell(QPushButton):
-    leftReleased = pyqtSignal()
-    rightClicked = pyqtSignal()
+    leftDown = pyqtSignal()
+    leftAvailReleased = pyqtSignal()
+    rightDown = pyqtSignal()
+    mouseReleased = pyqtSignal()
 
     def __init__(self, row, col, dpi, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -239,7 +270,6 @@ class Cell(QPushButton):
         self.setFixedSize(int(0.22 * self.dpi), int(0.22 * self.dpi))
         self.setFont(QFont('MINE-SWEEPER'))
         self._updateStyle()
-        self.is_pressed = False
         # 创建阴影效果
         self.shadow = QGraphicsDropShadowEffect(self)
         self.shadow.setBlurRadius(int(0.07 * self.dpi))
@@ -253,24 +283,20 @@ class Cell(QPushButton):
     def mousePressEvent(self, event):
         if self.rect().contains(event.pos()):
             if event.button() == Qt.LeftButton and self.state != CellState.UNREVEALED_FLAG:
-                self.is_pressed = True
-                style = self._getStyle(holding=True)
-                self.setStyleSheet(style)
+                self.leftDown.emit()
+                self._updateStyle(holding=True)
             elif event.button() == Qt.RightButton:
-                self.rightClicked.emit()
-        else:
-            super().mousePressEvent(event)
+                self.rightDown.emit()
+        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         if self.rect().contains(event.pos()):
             if event.button() == Qt.LeftButton and self.state != CellState.UNREVEALED_FLAG:
-                if self.is_pressed:
-                    self.leftReleased.emit()
-                self.is_pressed = False
-        else:
-            super().mouseReleaseEvent(event)
+                self.leftAvailReleased.emit()
+        self.mouseReleased.emit()
         self._updateStyle()
-        
+        super().mouseReleaseEvent(event)
+
     def updateState(self, new_state, mines_around=None, is_last_action=None):
         self.state = new_state
         if self.state == CellState.UNREVEALED_FLAG:
@@ -315,9 +341,12 @@ class Cell(QPushButton):
             csstext += f' background-color: {background_color}; padding: 0px;'
         return csstext
 
-    def _updateStyle(self, is_last_action=None):
-        self.setStyleSheet(self._getStyle(is_last_action=is_last_action))
-        self.setText(self.text)
+    def _updateStyle(self, holding=False, is_last_action=None):
+        if holding:
+            self.setStyleSheet(self._getStyle(holding=True))
+        else:
+            self.setStyleSheet(self._getStyle(is_last_action=is_last_action))
+            self.setText(self.text)
 
     def paintEvent(self, event):
         super().paintEvent(event)
