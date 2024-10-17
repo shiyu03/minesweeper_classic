@@ -1,8 +1,9 @@
 from PyQt5.QtWidgets import QMainWindow, QPushButton, QGridLayout, QWidget, QMessageBox, QLabel, QVBoxLayout, QGraphicsDropShadowEffect, QAction
-from PyQt5.QtGui import QColor, QFont, QLinearGradient, QBrush, QPen, QPainter, QFontMetrics
+from PyQt5.QtGui import QColor, QFont, QLinearGradient, QBrush, QPen, QPainter, QFontMetrics, QIntValidator
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from .minesweeper_env import MinesweeperEnv, CellState
+from PyQt5.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QVBoxLayout
 
 COLORS = {
     '1': QColor(0, 0, 255),      # 蓝色
@@ -76,6 +77,59 @@ class MinesweeperGame(QMainWindow):
         hardAction = QAction('Hard', self)
         hardAction.triggered.connect(lambda: self.newGame(30, 16, 99))
         gameMenu.addAction(hardAction)
+
+        customAction = QAction('Custom', self)
+        customAction.triggered.connect(self.customGame)
+        gameMenu.addAction(customAction)
+
+    def customGame(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Custom Game')
+
+        layout = QVBoxLayout(dialog)
+
+        form_layout = QFormLayout()
+        layout.addLayout(form_layout)
+
+        rows_input = QLineEdit(dialog)
+        rows_input.setValidator(QIntValidator(1, 50, dialog))
+        form_layout.addRow('rows(1,50):', rows_input)
+
+        cols_input = QLineEdit(dialog)
+        cols_input.setValidator(QIntValidator(1, 50, dialog))
+        form_layout.addRow('columns(1,50):', cols_input)
+
+        mines_input = QLineEdit(dialog)
+        mines_input.setValidator(QIntValidator(dialog))
+        form_layout.addRow('mines:', mines_input)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, dialog)
+        button_box.accepted.connect(lambda: self.validateInput(rows_input, cols_input, mines_input, dialog))
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        dialog.exec_()
+
+    def validateInput(self, rows_input, cols_input, mines_input, dialog):
+        try:
+            rows = int(rows_input.text())
+            cols = int(cols_input.text())
+            mines = int(mines_input.text())
+
+            if not (1 <= rows <= 50) or not (1 <= cols <= 50) or not (1 <= mines < rows*cols):
+                raise ValueError("Input out of range")
+
+            # 如果所有输入都有效，调用 newGame 并关闭对话框
+            self.newGame(rows, cols, mines)
+            dialog.accept()
+
+        except ValueError as e:
+            # 显示错误消息框
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setWindowTitle("Invalid Input")
+            msg_box.setText(str(e) + "\nPlease enter values again.")
+            msg_box.exec_()
 
     def add_cell(self, row, col):
         button = Cell(row, col, self.dpi)
