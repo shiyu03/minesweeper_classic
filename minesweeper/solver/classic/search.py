@@ -117,7 +117,11 @@ class ClassicMinesweeperSolver:
                         ua = UnrevealedArea(self.env, unrevealed_points, self.env.board[row][col] - flags_around)
                         if ua.check_affected_revealed_num_neighbors():
                             yield from ua.make_moves()
-
+    # TODO 参考穷举概率法EPP。加上剪枝（拆分出一个个独立的小岛）。多个不相交的perimeter不相交的时候单独处理，其他小岛视为均匀分布，同时结合剩余雷数。
+    # 一个数字对应一个式子，先列一个式子，解不出来就再加一个式子，直到解出来。（怎么选先加谁？还是所有相邻的两两组合都依次试一遍，还是直接把整个perimeter全都确定了？全确定了时间太久，能不能剪枝？）
+    # 测试方法最简单的话写一个dfs
+    # TODO 两篇文章结合一下，CSP里面step6的best guess计算方法可以替换成另一篇论文里的
+    # TODO 算好概率后，用画圆的方式显示在UI上
     def make_advanced2_moves(self):
         """两个相邻数字时的定律"""
         couples: set[NumCouple] = set()

@@ -276,6 +276,9 @@ class Cell(QPushButton):
         self.shadow.setColor(QColor(0, 0, 0))
         self.shadow.setOffset(0, 0)
         self.setGraphicsEffect(self.shadow)
+        self._plot_qvalue = False
+        self._radius = None
+        self._rgb_tuple = None
 
     def cleanup(self):
         self.setGraphicsEffect(None)
@@ -307,6 +310,7 @@ class Cell(QPushButton):
             self.text = '*'
         else:
             self.text = ''
+            self._plot_qvalue = False
         self._updateStyle(is_last_action=is_last_action)
 
     def _getStyle(self, holding=False, is_last_action=None):
@@ -348,6 +352,12 @@ class Cell(QPushButton):
             self.setStyleSheet(self._getStyle(is_last_action=is_last_action))
             self.setText(self.text)
 
+    def plotQValue(self, rgb_tuple, radius):
+        self._plot_qvalue = True
+        self._rgb_tuple = rgb_tuple
+        self._radius = radius
+        self.update()
+
     def paintEvent(self, event):
         super().paintEvent(event)
         if self.state == CellState.UNREVEALED_FLAG:
@@ -371,3 +381,11 @@ class Cell(QPushButton):
 
             # 确保文本居中对齐
             painter.drawText(rect, Qt.AlignCenter, self.text)
+        elif self.state == CellState.UNREVEALED_EMPTY and self._plot_qvalue:
+            # Draw the circle on top of the button
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setBrush(QBrush(QColor(*self._rgb_tuple)))
+            painter.setPen(Qt.NoPen)
+            center = self.rect().center()
+            painter.drawEllipse(center, self._radius, self._radius)
