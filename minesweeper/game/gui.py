@@ -1,9 +1,9 @@
-from PyQt5.QtWidgets import QMainWindow, QPushButton, QGridLayout, QWidget, QMessageBox, QLabel, QVBoxLayout, QGraphicsDropShadowEffect, QAction
+from PyQt5.QtWidgets import QMainWindow, QPushButton, QGridLayout, QWidget, QMessageBox, QLabel, QVBoxLayout, \
+    QGraphicsDropShadowEffect, QAction, QDialog, QFormLayout, QLineEdit, QDialogButtonBox
 from PyQt5.QtGui import QColor, QFont, QLinearGradient, QBrush, QPen, QPainter, QFontMetrics, QIntValidator
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from .minesweeper_env import MinesweeperEnv, CellState
-from PyQt5.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QVBoxLayout
 
 COLORS = {
     '1': QColor(0, 0, 255),      # 蓝色
@@ -79,12 +79,34 @@ class MinesweeperGame(QMainWindow):
         gameMenu.addAction(hardAction)
 
         customAction = QAction('Custom', self)
-        customAction.triggered.connect(self.customGame)
+        customAction.triggered.connect(self.customBoard)
         gameMenu.addAction(customAction)
 
-    def customGame(self):
-        dialog = QDialog(self)
-        dialog.setWindowTitle('Custom Game')
+    def customBoard(self):
+        def validateInput():
+            try:
+                rows = int(rows_input.text())
+                cols = int(cols_input.text())
+                mines = int(mines_input.text())
+                mines_input.validator().setRange(1, rows * cols - 1)
+
+                if not all([
+                    rows_input.hasAcceptableInput(),
+                    cols_input.hasAcceptableInput(),
+                    mines_input.hasAcceptableInput()
+                ]):
+                    raise ValueError("Input out of range")
+
+                # 如果所有输入都有效，调用 newGame 并关闭对话框
+                self.newGame(rows, cols, mines)
+                dialog.accept()
+
+            except ValueError as e:
+                # 显示错误消息框
+                QMessageBox.warning(self, "Invalid Input", str(e) + "\nPlease enter values again.")
+
+        dialog = QDialog(self, Qt.WindowSystemMenuHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        dialog.setWindowTitle('Custom Board')
 
         layout = QVBoxLayout(dialog)
 
@@ -93,43 +115,22 @@ class MinesweeperGame(QMainWindow):
 
         rows_input = QLineEdit(dialog)
         rows_input.setValidator(QIntValidator(1, 50, dialog))
-        form_layout.addRow('rows(1,50):', rows_input)
+        form_layout.addRow('rows(1-50):', rows_input)
 
         cols_input = QLineEdit(dialog)
         cols_input.setValidator(QIntValidator(1, 50, dialog))
-        form_layout.addRow('columns(1,50):', cols_input)
+        form_layout.addRow('columns(1-50):', cols_input)
 
         mines_input = QLineEdit(dialog)
         mines_input.setValidator(QIntValidator(dialog))
         form_layout.addRow('mines:', mines_input)
 
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, dialog)
-        button_box.accepted.connect(lambda: self.validateInput(rows_input, cols_input, mines_input, dialog))
+        button_box.accepted.connect(validateInput)
         button_box.rejected.connect(dialog.reject)
         layout.addWidget(button_box)
 
-        dialog.exec_()
-
-    def validateInput(self, rows_input, cols_input, mines_input, dialog):
-        try:
-            rows = int(rows_input.text())
-            cols = int(cols_input.text())
-            mines = int(mines_input.text())
-
-            if not (1 <= rows <= 50) or not (1 <= cols <= 50) or not (1 <= mines < rows*cols):
-                raise ValueError("Input out of range")
-
-            # 如果所有输入都有效，调用 newGame 并关闭对话框
-            self.newGame(rows, cols, mines)
-            dialog.accept()
-
-        except ValueError as e:
-            # 显示错误消息框
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setWindowTitle("Invalid Input")
-            msg_box.setText(str(e) + "\nPlease enter values again.")
-            msg_box.exec_()
+        dialog.exec()
 
     def add_cell(self, row, col):
         button = Cell(row, col, self.dpi)
